@@ -17,9 +17,7 @@ const stopBtn = document.getElementById('stopBtn');
 const statusBar = document.getElementById('statusBar');
 const statusText = document.getElementById('statusText');
 const playhead = document.getElementById('playhead');
-const exportMelody = document.getElementById('exportMelody');
-const exportChords = document.getElementById('exportChords');
-const exportFull = document.getElementById('exportFull');
+const exportMidi = document.getElementById('exportMidi');
 const optionsBtn = document.getElementById('optionsBtn');
 const optionsMenu = document.getElementById('optionsMenu');
 const optionCopyPrompt = document.getElementById('optionCopyPrompt');
@@ -91,48 +89,8 @@ stopBtn.addEventListener('click', () => {
     stopPlaybackNative();
 });
 
-// Export button handlers
-exportMelody.addEventListener('click', () => {
-    console.log('Melody export clicked');
-
-    if (!hasJuce) {
-        console.error('JUCE not available');
-        showStatus('JUCE backend not available', 'error');
-        return;
-    }
-
-    const text = compositionTextArea.value;
-    if (!text.trim()) {
-        console.warn('No text');
-        showStatus('No composition text', 'error');
-        return;
-    }
-
-    console.log('Calling exportMIDI melody');
-    try {
-        exportMIDINative('melody', text);
-    } catch (e) {
-        console.error('Export error:', e);
-        showStatus('Error: ' + e.message, 'error');
-    }
-});
-
-exportChords.addEventListener('click', () => {
-    if (!hasJuce) {
-        showStatus('JUCE backend not available', 'error');
-        return;
-    }
-
-    const text = compositionTextArea.value;
-    if (!text.trim()) {
-        showStatus('No composition text', 'error');
-        return;
-    }
-
-    exportMIDINative('chords', text);
-});
-
-exportFull.addEventListener('click', () => {
+// Export button handler
+exportMidi.addEventListener('click', () => {
     if (!hasJuce) {
         showStatus('JUCE backend not available', 'error');
         return;
@@ -146,6 +104,34 @@ exportFull.addEventListener('click', () => {
 
     exportMIDINative('full', text);
 });
+
+// Drag-and-drop handlers for MIDI export
+function setupDragHandlers(element, mode) {
+    element.addEventListener('dragstart', (e) => {
+        const text = compositionTextArea.value;
+        if (!text.trim()) {
+            e.preventDefault();
+            showStatus('No composition to export', 'error');
+            return;
+        }
+
+        // Visual feedback
+        element.classList.add('dragging');
+        showStatus(`Drag ${mode} MIDI to your DAW...`, 'success');
+
+        // Prepare MIDI data for drag (browser will handle the drag image)
+        if (hasJuce) {
+            exportMIDINative(mode, text);
+        }
+    });
+
+    element.addEventListener('dragend', () => {
+        element.classList.remove('dragging');
+        showStatus('Ready', 'success');
+    });
+}
+
+setupDragHandlers(exportMidi, 'full');
 
 // Options menu toggle
 optionsBtn.addEventListener('click', (e) => {
