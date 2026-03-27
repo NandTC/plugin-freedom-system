@@ -240,9 +240,10 @@ ipcMain.handle("save-file", async (_event, sourcePath) => {
   return result.filePath;
 });
 
-// Open file in default app (e.g., GarageBand)
-ipcMain.handle("open-in-daw", async (_event, filePath) => {
-  await shell.openPath(filePath);
+// Read a file as base64 (for in-app MIDI playback)
+ipcMain.handle("read-file", async (_event, filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  return fs.readFileSync(filePath).toString("base64");
 });
 
 // POST /generate

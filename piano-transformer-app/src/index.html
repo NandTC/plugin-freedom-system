@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';" />
+        content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src blob:;" />
   <title>Piano Transformer</title>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -85,6 +85,12 @@
     </div>
   </div>
 
+  <script src="js/vendor/Tone.js"></script>
+  <script src="js/vendor/Midi.js"></script>
+  <script>
+    // @tonejs/midi UMD exports {Midi, Track, Header} onto self — alias for convenience
+    if (typeof Midi === "undefined" && typeof self.Midi !== "undefined") window.Midi = self.Midi;
+  </script>
   <script src="js/app.js"></script>
 </body>
 </html>

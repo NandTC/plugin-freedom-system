@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // File operations
   openFile:    ()           => ipcRenderer.invoke("open-file"),
   saveFile:    (srcPath)    => ipcRenderer.invoke("save-file", srcPath),
-  openInDaw:   (filePath)   => ipcRenderer.invoke("open-in-daw", filePath),
+  readFile:    (filePath)   => ipcRenderer.invoke("read-file", filePath),
 
   // Generation
   generate:    (params)     => ipcRenderer.invoke("generate", params),
