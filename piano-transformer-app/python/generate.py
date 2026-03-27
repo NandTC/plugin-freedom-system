@@ -93,16 +93,13 @@ def load_model(checkpoint_dir):
     problem_hparams = problem.get_hparams(hparams)
     hparams.problem_hparams = problem_hparams
 
-    decode_hp = decoding.decode_hparams("beam_size=1,alpha=0.0")
-    decode_hp.batch_size = 1
-
     run_config = trainer_lib.create_run_config(hparams)
 
     estimator = trainer_lib.create_estimator(
         model_name,
         hparams,
         run_config,
-        decode_hparams=decode_hp,
+        decode_hparams=decoding.decode_hparams("beam_size=1,alpha=0.0"),
     )
 
     _estimator = estimator
@@ -165,21 +162,18 @@ def generate_midi(
     try:
         ckpt_path = _get_checkpoint_path(checkpoint_dir)
 
-        # Build decode targets (primer IDs + EOS pad)
-        targets = primer_tokens[:]
+        # Update sampling temperature for this call
+        _hparams.sampling_temp = temperature
 
-        # Decode
-        decode_hp = decoding.decode_hparams()
-        decode_hp.alpha = 0.0
-        decode_hp.beam_size = 1
+        # decode_hparams matching the working test_generate.py pattern
+        decode_hp = decoding.decode_hparams("beam_size=1,alpha=0.0")
         decode_hp.extra_length = sequence_length
+        decode_hp.batch_size = 1
 
-        # Wrap generation in a way we can estimate time
+        # Progress estimator (time-based linear estimate)
         import time
         estimated_total = sequence_length * 0.3  # ~0.3s per token on CPU
         start_time = time.time()
-
-        # Progress estimator runs in a daemon thread
         stop_progress = threading.Event()
 
         def _update_progress():
@@ -192,26 +186,27 @@ def generate_midi(
         progress_thread = threading.Thread(target=_update_progress, daemon=True)
         progress_thread.start()
 
-        # ── Actual generation ──────────────────────────────────────────
-        # Replicate the Colab notebook's generate call:
-        #   unconditional_samples = unconditional_generate(targets=[], decode_length=1024)
-        # We use tensor2tensor's Estimator.predict() which the Colab wraps.
-
-        inputs = {
-            "targets": [targets + [1]],  # 1 = EOS token to start
-        }
+        # ── input_fn — exactly as in working test_generate.py ─────────
+        targets_val = primer_tokens[:] if primer_tokens else [0]
 
         def input_fn(params):
-            dataset = tf.data.Dataset.from_tensors(inputs)
-            dataset = dataset.batch(1)
+            del params
+            dataset = tf.data.Dataset.from_tensors({
+                "targets": tf.constant([targets_val], dtype=tf.int32),
+            })
             return dataset
 
         result_ids = None
         for result in _estimator.predict(
             input_fn,
             checkpoint_path=ckpt_path,
+            yield_single_examples=False,
         ):
-            result_ids = result["outputs"].tolist()
+            if "outputs" in result:
+                result_ids = result["outputs"].flatten().tolist()
+            elif "targets" in result:
+                result_ids = result["targets"].flatten().tolist()
+            break
             break  # single prediction
 
         stop_progress.set()

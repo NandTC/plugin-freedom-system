@@ -204,6 +204,9 @@ async function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, "src", "index.html"));
 
+  // Open DevTools for debugging (remove before release)
+  mainWindow.webContents.openDevTools({ mode: "detach" });
+
   mainWindow.on("closed", () => {
     mainWindow = null;
   });

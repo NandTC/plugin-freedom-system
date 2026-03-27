@@ -231,28 +231,36 @@
   });
 
   // ─── Playback (Tone.js + @tonejs/midi) ────────────────────────────────────
+  // Audio is lazy-initialized on first Play click to avoid AudioContext
+  // creation before user gesture (which crashes Chromium's renderer).
 
-  const synth = new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: "triangle8" },
-    envelope: { attack: 0.005, decay: 0.4, sustain: 0.35, release: 1.8 },
-    volume: -6,
-  }).toDestination();
+  let synth = null;
+  let parts = [];
 
-  // Soft reverb for warmth
-  const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.25 }).toDestination();
-  synth.connect(reverb);
+  function initAudio() {
+    if (synth) return; // already initialized
+    synth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: "triangle8" },
+      envelope: { attack: 0.005, decay: 0.4, sustain: 0.35, release: 1.8 },
+      volume: -8,
+    }).toDestination();
+  }
 
   function stopPlayback() {
     Tone.Transport.stop();
     Tone.Transport.cancel();
-    scheduledParts.forEach((p) => p.dispose());
-    scheduledParts = [];
+    parts.forEach((p) => p.dispose());
+    parts = [];
     isPlaying = false;
     btnPlay.textContent = "Play";
   }
 
   async function startPlayback(midiPath) {
-    // Read file bytes via IPC (can't use fs directly in renderer)
+    // Resume/init audio (requires user gesture — we're inside a click handler)
+    await Tone.start();
+    initAudio();
+
+    // Read file bytes via IPC
     const base64 = await window.electronAPI.readFile(midiPath);
     if (!base64) { setStatus("Could not read MIDI file"); return; }
 
@@ -264,36 +272,34 @@
     // Parse MIDI
     const midi = new Midi(bytes.buffer);
 
-    // Schedule all tracks
-    Tone.Transport.cancel();
-    scheduledParts = [];
-
-    midi.tracks.forEach((track) => {
-      track.notes.forEach((note) => {
-        const part = new Tone.Part((time) => {
-          synth.triggerAttackRelease(note.name, note.duration, time, note.velocity);
-        }, [[note.time, note]]);
-        part.start(0);
-        scheduledParts.push(part);
-      });
-    });
-
-    // Set tempo from MIDI
+    // Set tempo
     if (midi.header.tempos.length > 0) {
       Tone.Transport.bpm.value = midi.header.tempos[0].bpm;
     }
 
-    await Tone.start(); // resume AudioContext
+    // One Part per track (not per note)
+    Tone.Transport.cancel();
+    parts = [];
+
+    midi.tracks.forEach((track) => {
+      if (track.notes.length === 0) return;
+      const events = track.notes.map((n) => [n.time, n]);
+      const part = new Tone.Part((time, note) => {
+        synth.triggerAttackRelease(note.name, note.duration, time, note.velocity);
+      }, events);
+      part.start(0);
+      parts.push(part);
+    });
+
     Tone.Transport.start();
     isPlaying = true;
     btnPlay.textContent = "Stop";
 
-    // Auto-stop when done
-    const duration = midi.duration;
+    // Auto-stop when piece ends
     Tone.Transport.scheduleOnce(() => {
       stopPlayback();
       setStatus("Playback complete");
-    }, `+${duration}`);
+    }, midi.duration + 2);
   }
 
   btnPlay.addEventListener("click", async () => {
