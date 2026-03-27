@@ -29,6 +29,7 @@
 | JazzGptMidi | 📦 Installed | 1.0.0 | Utility (Text-to-MIDI Converter) | 2026-02-04 |
 | Coltranator | 💡 Ideated | - | Instrument (Sampler) | 2026-02-26 |
 | ChordGPT | 🚧 Stage 1 | - | MIDI Generator + Instrument | 2026-03-17 |
+| PianoTransformer | 🚧 Stage 0 | - | Utility (AI MIDI Generator) | 2026-03-27 |
 
 **For detailed plugin information (lifecycle timeline, known issues, parameters, etc.), see:**
 `plugins/[PluginName]/NOTES.md`
